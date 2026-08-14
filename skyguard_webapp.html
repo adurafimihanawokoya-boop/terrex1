@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkyGuard — Live area monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #090d16;
+    --bg-grid: #0d1424;
+    --panel: #121a2e;
+    --panel-raised: #16203a;
+    --border: #212c46;
+    --text: #eaf0f7;
+    --text-dim: #8593ad;
+    --text-faint: #566080;
+    --safe: #35d28a;
+    --safe-dim: rgba(53,210,138,0.14);
+    --amber: #ffb648;
+    --amber-dim: rgba(255,182,72,0.14);
+    --danger: #ff5c5c;
+    --danger-dim: rgba(255,92,92,0.15);
+    --accent: #4c8dff;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 9px;
+  }
+
+  *{ box-sizing: border-box; margin:0; padding:0; }
+  html{ -webkit-text-size-adjust: 100%; }
+
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  a{ color: inherit; text-decoration: none; }
+  button{ font-family: inherit; cursor: pointer; }
+  input{ font-family: inherit; }
+
+  :focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection{ background: var(--accent); color: #fff; }
+
+  /* ============ background texture ============ */
+  .bg-grid{
+    position: fixed; inset: 0; z-index: -1;
+    background-image:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size: 42px 42px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 90%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 90%);
+    opacity: .6;
+  }
+
+  /* ============ app shell ============ */
+  .app-shell{
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ---- sidebar (desktop) ---- */
+  .sidebar{
+    width: 248px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 28px 20px;
+    display: none;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .brand{
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 40px;
+    padding-left: 4px;
+  }
+  .brand-mark{
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #3ee0ab, #1aa97c);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .brand-mark svg{ width: 18px; height: 18px; }
+  .brand-name{
+    font-family: var(--font-display); font-weight: 700; font-size: 16.5px;
+    letter-spacing: 0.5px;
+  }
+
+  .nav{ display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .nav-item{
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 12px; border-radius: var(--radius-sm);
+    color: var(--text-dim); font-size: 14px; font-weight: 500;
+    transition: background .15s ease, color .15s ease;
+  }
+  .nav-item svg{ width: 18px; height: 18px; flex-shrink: 0; opacity: .85; }
+  .nav-item:hover{ background: var(--panel); color: var(--text); }
+  .nav-item.active{ background: var(--panel-raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+  .nav-item.active svg{ opacity: 1; color: var(--safe); }
+
+  .sidebar-footer{
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-top: 12px;
+  }
+  .avatar-sm{
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg,#8fe0c4,#4fbf98);
+    display:flex; align-items:center; justify-content:center;
+    font-size: 12px; font-weight: 700; color: #062017; flex-shrink:0;
+  }
+  .sidebar-footer .who{ font-size: 13px; font-weight: 600; }
+  .sidebar-footer .role{ font-size: 11.5px; color: var(--text-faint); }
+
+  /* ---- topbar (mobile/tablet) ---- */
+  .topbar{
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(9,13,22,0.85);
+    backdrop-filter: blur(10px);
+  }
+  .topbar .brand{ margin-bottom: 0; }
+  .topbar .brand-name{ font-size: 15px; }
+
+  .status-pill{
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border-radius: 20px;
+    background: var(--safe-dim); color: var(--safe);
+    font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
+    letter-spacing: 0.4px;
+  }
+  .status-dot{
+    width: 6px; height: 6px; border-radius: 50%; background: var(--safe);
+    box-shadow: 0 0 0 0 rgba(53,210,138,0.6);
+    animation: dotpulse 2s infinite;
+  }
+  @keyframes dotpulse{
+    0%{ box-shadow: 0 0 0 0 rgba(53,210,138,0.55); }
+    70%{ box-shadow: 0 0 0 6px rgba(53,210,138,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(53,210,138,0); }
+  }
+
+  /* ---- main content ---- */
+  .main{
+    flex: 1;
+    min-width: 0;
+    padding: 28px 20px 100px;
+  }
+  .main-inner{ max-width: 1080px; margin: 0 auto; }
+
+  .page-head{
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .greeting-eyebrow{
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint);
+    letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .greeting{
+    font-family: var(--font-display); font-size: clamp(22px, 4vw, 30px);
+    font-weight: 600;
+  }
+  .greeting-sub{ color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+
+  /* ============ dashboard grid ============ */
+  .dash-grid{
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+  }
+
+  .panel-label{
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .panel-label .lb{
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .panel-label .meta{
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+  }
+
+  /* ---- signature: radar scan panel ---- */
+  .radar-panel{ position: relative; overflow: hidden; }
+  .radar-stage{
+    position: relative;
+    height: 240px;
+    border-radius: var(--radius-md);
+    background: radial-gradient(circle at 50% 50%, #0f1930 0%, #0a1120 70%);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .radar-rings{
+    position: absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+    width: 220px; height: 220px;
+  }
+  .radar-rings::before, .radar-rings::after, .radar-rings i{
+    content: ''; position: absolute; border-radius: 50%;
+    border: 1px solid rgba(76,141,255,0.14);
+  }
+  .radar-rings::before{ inset: 0; }
+  .radar-rings::after{ inset: 36px; }
+  .radar-rings i{ position:absolute; inset: 72px; display:block; }
+  .radar-sweep{
+    position: absolute; top:50%; left:50%; width: 220px; height: 220px;
+    transform: translate(-50%,-50%);
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(76,141,255,0.35), rgba(76,141,255,0) 28%);
+    animation: sweep 4s linear infinite;
+  }
+  @keyframes sweep{ to{ transform: translate(-50%,-50%) rotate(360deg); } }
+
+  .radar-center-pin{
+    position: absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--safe);
+    box-shadow: 0 0 0 5px rgba(53,210,138,0.18), 0 0 14px rgba(53,210,138,0.5);
+    z-index: 3;
+  }
+  .radar-blip{
+    position: absolute; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--amber); cursor: pointer; z-index: 2;
+    box-shadow: 0 0 0 4px rgba(255,182,72,0.18);
+  }
+  .radar-blip.danger{ background: var(--danger); box-shadow: 0 0 0 4px rgba(255,92,92,0.18); }
+
+  .radar-readout{
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 12px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint);
+    flex-wrap: wrap; gap: 6px;
+  }
+  .radar-readout .live{ color: var(--safe); }
+
+  /* ---- stat cards ---- */
+  .stat-row{ display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
+  .stat-card{
+    background: var(--panel-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 16px;
+  }
+  .stat-card .num{ font-family: var(--font-display); font-size: 26px; font-weight: 600; }
+  .stat-card .lb{ font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  /* ---- quick actions ---- */
+  .quick-grid{ display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+  .quick-btn{
+    background: var(--panel-raised); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-md); padding: 14px 12px; text-align: left;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .quick-btn:hover{ border-color: var(--accent); transform: translateY(-1px); }
+  .quick-btn .ic{ font-size: 18px; }
+  .quick-btn .lb{ font-size: 13px; font-weight: 600; }
+
+  /* ---- SOS ---- */
+  .sos-wrap{ display: flex; align-items: center; gap: 16px; }
+  .sos-btn{
+    position: relative; width: 84px; height: 84px; border-radius: 50%;
+    border: none; flex-shrink: 0;
+    background: radial-gradient(circle at 35% 30%, #ff8a8a, #e04343 65%);
+    color: #2b0808; font-family: var(--font-display); font-weight: 700; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 6px rgba(255,92,92,0.12);
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
+  }
+  .sos-btn svg.ring{ position: absolute; inset: -6px; transform: rotate(-90deg); }
+  .sos-btn svg.ring circle{
+    fill: none; stroke: #ffffff; stroke-width: 3;
+    stroke-dasharray: 264; stroke-dashoffset: 264;
+    transition: stroke-dashoffset .05s linear;
+  }
+  .sos-copy .t{ font-weight: 600; font-size: 14px; }
+  .sos-copy .d{ font-size: 12.5px; color: var(--text-dim); margin-top: 3px; }
+  .sos-copy .demo-flag{ font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); margin-top: 6px; }
+
+  /* ---- destination check ---- */
+  .check-row{ display: flex; gap: 10px; flex-wrap: wrap; }
+  .check-input{
+    flex: 1; min-width: 180px;
+    background: var(--panel-raised); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: 12px 14px; font-size: 14px;
+  }
+  .check-input::placeholder{ color: var(--text-faint); }
+  .check-btn{
+    background: linear-gradient(135deg, #35d28a, #1aa97c); border: none;
+    color: #06231a; font-weight: 700; font-size: 13.5px;
+    border-radius: var(--radius-sm); padding: 12px 20px; white-space: nowrap;
+  }
+  .check-btn:disabled{ opacity: .6; cursor: default; }
+
+  .check-result{
+    margin-top: 14px; padding: 14px; border-radius: var(--radius-md);
+    display: none; align-items: center; gap: 12px;
+    border: 1px solid var(--border);
+  }
+  .check-result.show{ display: flex; }
+  .check-result.safe{ background: var(--safe-dim); border-color: rgba(53,210,138,0.3); }
+  .check-result.caution{ background: var(--amber-dim); border-color: rgba(255,182,72,0.3); }
+  .check-result .icon{ font-size: 20px; }
+  .check-result .title{ font-weight: 700; font-size: 13.5px; }
+  .check-result .sub{ font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+
+  .check-spin{
+    display: none; align-items: center; gap: 8px; margin-top: 12px;
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-dim);
+  }
+  .check-spin.show{ display: flex; }
+  .spinner{
+    width: 13px; height: 13px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  /* ---- alert feed ---- */
+  .feed-item{
+    display: flex; gap: 12px; padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .feed-item:last-child{ border-bottom: none; padding-bottom: 0; }
+  .feed-tag{
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    padding: 3px 7px; border-radius: 5px; height: fit-content; white-space: nowrap;
+    letter-spacing: 0.4px;
+  }
+  .feed-tag.critical{ background: var(--danger-dim); color: #ff8a8a; }
+  .feed-tag.resolved{ background: var(--safe-dim); color: var(--safe); }
+  .feed-body .t{ font-size: 13.5px; font-weight: 600; }
+  .feed-body .m{ font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+
+  /* ---- trusted circle ---- */
+  .circle-row{ display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .circle-avatars{ display: flex; }
+  .circle-avatars .avatar-sm{ margin-left: -8px; border: 2px solid var(--panel); }
+  .circle-avatars .avatar-sm:first-child{ margin-left: 0; }
+  .manage-link{ font-size: 12.5px; color: var(--accent); font-weight: 600; }
+
+  /* ---- safe walk timer ---- */
+  .timer-row{ display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .timer-select{
+    background: var(--panel-raised); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px;
+  }
+  .timer-display{ font-family: var(--font-mono); font-size: 22px; font-weight: 600; display:none; }
+  .timer-display.show{ display: block; }
+  .timer-btn{
+    background: var(--panel-raised); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: 10px 18px; font-weight: 600; font-size: 13px;
+  }
+  .timer-btn.primary{ background: linear-gradient(135deg,#35d28a,#1aa97c); color:#06231a; border:none; }
+
+  /* ============ bottom tab bar (mobile) ============ */
+  .tabbar{
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    background: rgba(11,16,28,0.92);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border);
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+  }
+  .tabbar-inner{ display: flex; justify-content: space-around; }
+  .tab-item{
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    color: var(--text-faint); font-size: 10.5px; font-weight: 600;
+    padding: 6px 10px; border-radius: 10px; flex: 1; max-width: 84px;
+  }
+  .tab-item svg{ width: 20px; height: 20px; }
+  .tab-item.active{ color: var(--safe); }
+
+  /* ============ responsive breakpoints ============ */
+  @media (min-width: 640px){
+    .stat-row{ grid-template-columns: repeat(3, 1fr); }
+  }
+
+  @media (min-width: 900px){
+    .sidebar{ display: flex; }
+    .topbar{ display: none; }
+    .main{ padding: 36px 40px 40px; }
+    .dash-grid{
+      grid-template-columns: 1.3fr 1fr;
+      align-items: start;
+    }
+    .col-span-2{ grid-column: 1 / -1; }
+    .stat-row{ grid-template-columns: repeat(3, 1fr); }
+  }
+
+  @media (max-width: 899px){
+    .tabbar{ display: block; }
+    .main{ padding-bottom: 96px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .radar-sweep, .status-dot{ animation: none !important; }
+    *{ transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<div class="app-shell">
+
+  <!-- ===================== SIDEBAR (desktop) ===================== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5 3.4 8.7 8 9 4.6-.3 8-4 8-9V5l-8-3z" stroke="#06231a" stroke-width="2" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="brand-name">SKYGUARD</div>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-item active" href="#" data-tab-target="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="nav-item" href="#" data-tab-target="alerts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v3M4.2 6.2l2 2M2 13h3M19 13h3M17.8 8.2l2-2M12 21a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2z"/><path d="M6 13c0-4 2.5-6 6-6s6 2 6 6c0 2.5 1 3.5 1 3.5H5S6 15.5 6 13z"/></svg>
+        Alerts
+      </a>
+      <a class="nav-item" href="#" data-tab-target="circle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="18" cy="8" r="2.4"/><path d="M17 14.2c2.8.5 4.5 2.5 5 5.8"/></svg>
+        Trusted circle
+      </a>
+      <a class="nav-item" href="#" data-tab-target="report">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 4.3 2.9 18a1.8 1.8 0 0 0 1.6 2.7h15a1.8 1.8 0 0 0 1.6-2.7L13.7 4.3a1.8 1.8 0 0 0-3.4 0z"/></svg>
+        Report
+      </a>
+      <a class="nav-item" href="#" data-tab-target="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.7 7.7 0 0 0-1.7-1L15 3h-4l-.3 2.5a7.7 7.7 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.7 7.7 0 0 0 1.7 1L9 21h4l.3-2.5a7.7 7.7 0 0 0 1.7-1l2.4 1 2-3.4L19.4 13z"/></svg>
+        Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="avatar-sm">A</div>
+      <div>
+        <div class="who">Amaka O.</div>
+        <div class="role">Personal plan</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== TOPBAR (mobile/tablet) ===================== -->
+  <div class="main-col" style="flex:1; min-width:0; display:flex; flex-direction:column;">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5 3.4 8.7 8 9 4.6-.3 8-4 8-9V5l-8-3z" stroke="#06231a" stroke-width="2" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="brand-name">SKYGUARD</div>
+      </div>
+      <span class="status-pill"><span class="status-dot"></span>ALL CLEAR</span>
+    </header>
+
+    <!-- ===================== MAIN CONTENT ===================== -->
+    <main class="main">
+      <div class="main-inner">
+
+        <div class="page-head">
+          <div>
+            <div class="greeting-eyebrow">Dashboard · Lekki Phase 1</div>
+            <h1 class="greeting">Good evening, Amaka</h1>
+            <div class="greeting-sub">Your area is quiet right now — last checked a few seconds ago.</div>
+          </div>
+          <span class="status-pill" id="desktopStatusPill" style="display:none;"><span class="status-dot"></span>ALL CLEAR</span>
+        </div>
+
+        <div class="dash-grid">
+
+          <!-- LEFT COLUMN -->
+          <div style="display:flex; flex-direction:column; gap:16px;">
+
+            <!-- Signature: live radar scan -->
+            <section class="panel radar-panel">
+              <div class="panel-label">
+                <span class="lb">Live area scan</span>
+                <span class="meta" id="radarMeta">updated 2s ago</span>
+              </div>
+              <div class="radar-stage">
+                <div class="radar-sweep"></div>
+                <div class="radar-rings"><i></i></div>
+                <div class="radar-blip" style="top:32%; left:64%;" title="Resolved · 2hr ago"></div>
+                <div class="radar-blip" style="top:70%; left:30%;" title="Resolved · yesterday"></div>
+                <div class="radar-center-pin"></div>
+              </div>
+              <div class="radar-readout">
+                <span>0.8KM RADIUS</span>
+                <span class="live">● SCANNING</span>
+                <span>2 RESOLVED REPORTS NEARBY</span>
+              </div>
+            </section>
+
+            <!-- Destination check -->
+            <section class="panel">
+              <div class="panel-label"><span class="lb">Check a destination</span></div>
+              <div class="check-row">
+                <input class="check-input" id="destInput" type="text" placeholder="Where are you headed?" />
+                <button class="check-btn" id="checkBtn">Check safety</button>
+              </div>
+              <div class="check-spin" id="checkSpin"><span class="spinner"></span> Checking live reports and route data…</div>
+              <div class="check-result" id="checkResult">
+                <span class="icon" id="resultIcon">✓</span>
+                <div>
+                  <div class="title" id="resultTitle">Clear to go</div>
+                  <div class="sub" id="resultSub">No incidents reported on this route.</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Live alert feed -->
+            <section class="panel">
+              <div class="panel-label"><span class="lb">Recent activity</span><span class="meta">Last 24 hours</span></div>
+              <div class="feed-item">
+                <span class="feed-tag resolved">RESOLVED</span>
+                <div class="feed-body">
+                  <div class="t">Suspicious activity — Bello Way</div>
+                  <div class="m">1.2km · 2 hr ago · confirmed by 5 neighbors</div>
+                </div>
+              </div>
+              <div class="feed-item">
+                <span class="feed-tag resolved">RESOLVED</span>
+                <div class="feed-body">
+                  <div class="t">Minor accident — Ring Road</div>
+                  <div class="m">2.1km · yesterday · traffic cleared</div>
+                </div>
+              </div>
+              <div class="feed-item">
+                <span class="feed-tag resolved">RESOLVED</span>
+                <div class="feed-body">
+                  <div class="t">Streetlight outage — Admiralty Way</div>
+                  <div class="m">0.9km · 2 days ago · reported to LASG</div>
+                </div>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- RIGHT COLUMN -->
+          <div style="display:flex; flex-direction:column; gap:16px;">
+
+            <div class="stat-row">
+              <div class="stat-card"><div class="num">92</div><div class="lb">Safety score</div></div>
+              <div class="stat-card"><div class="num">0</div><div class="lb">Active alerts</div></div>
+              <div class="stat-card"><div class="num">4</div><div class="lb">Trusted circle</div></div>
+            </div>
+
+            <!-- Quick actions -->
+            <section class="panel">
+              <div class="panel-label"><span class="lb">Quick actions</span></div>
+              <div class="quick-grid">
+                <button class="quick-btn"><span class="ic">🛰</span><span class="lb">Check a route</span></button>
+                <button class="quick-btn" id="timerScrollBtn"><span class="ic">⏱</span><span class="lb">Safe walk timer</span></button>
+                <button class="quick-btn"><span class="ic">📍</span><span class="lb">Report something</span></button>
+                <button class="quick-btn"><span class="ic">👥</span><span class="lb">Manage circle</span></button>
+              </div>
+            </section>
+
+            <!-- SOS -->
+            <section class="panel">
+              <div class="panel-label"><span class="lb">Emergency</span></div>
+              <div class="sos-wrap">
+                <button class="sos-btn" id="sosBtn">
+                  <svg class="ring" viewBox="0 0 90 90"><circle id="sosRing" cx="45" cy="45" r="42"></circle></svg>
+                  <span id="sosLabel">HOLD</span>
+                </button>
+                <div class="sos-copy">
+                  <div class="t" id="sosTitle">Press and hold 3 seconds</div>
+                  <div class="d">Alerts your trusted circle with your live location.</div>
+                  <div class="demo-flag">Demo interface — not connected to emergency services</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Trusted circle -->
+            <section class="panel">
+              <div class="panel-label"><span class="lb">Trusted circle</span></div>
+              <div class="circle-row">
+                <div class="circle-avatars">
+                  <div class="avatar-sm" style="background:#8fe0c4; color:#062017;">JT</div>
+                  <div class="avatar-sm" style="background:#ffc062; color:#3a1f00;">MB</div>
+                  <div class="avatar-sm" style="background:#9eb6ff; color:#0a1a3a;">DK</div>
+                  <div class="avatar-sm" style="background:#212c46;">+1</div>
+                </div>
+                <a class="manage-link" href="#">Manage circle →</a>
+              </div>
+            </section>
+
+            <!-- Safe walk timer -->
+            <section class="panel" id="timerPanel">
+              <div class="panel-label"><span class="lb">Safe walk timer</span></div>
+              <div class="timer-row">
+                <select class="timer-select" id="timerSelect">
+                  <option value="600">10 minutes</option>
+                  <option value="900" selected>15 minutes</option>
+                  <option value="1200">20 minutes</option>
+                  <option value="1800">30 minutes</option>
+                </select>
+                <div class="timer-display" id="timerDisplay">15:00</div>
+                <button class="timer-btn primary" id="timerBtn">Start walk</button>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ===================== TAB BAR (mobile) ===================== -->
+<nav class="tabbar">
+  <div class="tabbar-inner">
+    <a class="tab-item active" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Home
+    </a>
+    <a class="tab-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 13c0-4 2.5-6 6-6s6 2 6 6c0 2.5 1 3.5 1 3.5H5S6 15.5 6 13z"/><path d="M12 21a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2z"/></svg>
+      Alerts
+    </a>
+    <a class="tab-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 4.3 2.9 18a1.8 1.8 0 0 0 1.6 2.7h15a1.8 1.8 0 0 0 1.6-2.7L13.7 4.3a1.8 1.8 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+      Report
+    </a>
+    <a class="tab-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/></svg>
+      Circle
+    </a>
+    <a class="tab-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+      Profile
+    </a>
+  </div>
+</nav>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- live "updated Xs ago" readout ---------- */
+  var seconds = 0;
+  var radarMeta = document.getElementById('radarMeta');
+  setInterval(function(){
+    seconds++;
+    radarMeta.textContent = 'updated ' + seconds + 's ago';
+    if (seconds > 30) seconds = 0;
+  }, 1000);
+
+  /* ---------- destination safety check ---------- */
+  var destInput = document.getElementById('destInput');
+  var checkBtn = document.getElementById('checkBtn');
+  var checkSpin = document.getElementById('checkSpin');
+  var checkResult = document.getElementById('checkResult');
+  var resultIcon = document.getElementById('resultIcon');
+  var resultTitle = document.getElementById('resultTitle');
+  var resultSub = document.getElementById('resultSub');
+
+  checkBtn.addEventListener('click', function(){
+    var dest = destInput.value.trim();
+    if (!dest) { destInput.focus(); return; }
+
+    checkResult.classList.remove('show');
+    checkSpin.classList.add('show');
+    checkBtn.disabled = true;
+
+    setTimeout(function(){
+      checkSpin.classList.remove('show');
+      checkBtn.disabled = false;
+
+      // deterministic-feeling demo logic based on input length
+      var caution = (dest.length % 4 === 0);
+
+      checkResult.classList.remove('safe','caution');
+      if (caution){
+        checkResult.classList.add('caution','show');
+        resultIcon.textContent = '⚠';
+        resultTitle.textContent = 'Caution near ' + dest;
+        resultSub.textContent = 'A report was flagged along this route in the last few hours.';
+      } else {
+        checkResult.classList.add('safe','show');
+        resultIcon.textContent = '✓';
+        resultTitle.textContent = 'Clear to go';
+        resultSub.textContent = 'No incidents reported on the route to ' + dest + '.';
+      }
+    }, 900);
+  });
+  destInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') checkBtn.click();
+  });
+
+  /* ---------- SOS press-and-hold ---------- */
+  var sosBtn = document.getElementById('sosBtn');
+  var sosRing = document.getElementById('sosRing');
+  var sosLabel = document.getElementById('sosLabel');
+  var sosTitle = document.getElementById('sosTitle');
+  var circumference = 2 * Math.PI * 42;
+  sosRing.style.strokeDasharray = circumference;
+
+  var holdTimer = null, holdStart = null, holdRAF = null, activated = false;
+  var HOLD_MS = 3000;
+
+  function updateRing(){
+    var elapsed = Date.now() - holdStart;
+    var pct = Math.min(elapsed / HOLD_MS, 1);
+    sosRing.style.strokeDashoffset = circumference * (1 - pct);
+    if (pct < 1 && !activated){
+      holdRAF = requestAnimationFrame(updateRing);
+    }
+  }
+
+  function startHold(e){
+    e.preventDefault();
+    if (activated) return;
+    holdStart = Date.now();
+    holdRAF = requestAnimationFrame(updateRing);
+    holdTimer = setTimeout(function(){
+      activated = true;
+      sosLabel.textContent = 'SENT';
+      sosTitle.textContent = 'Alert sent to your trusted circle';
+      setTimeout(resetSOS, 2600);
+    }, HOLD_MS);
+  }
+
+  function cancelHold(){
+    clearTimeout(holdTimer);
+    cancelAnimationFrame(holdRAF);
+    if (!activated){
+      sosRing.style.strokeDashoffset = circumference;
+    }
+  }
+
+  function resetSOS(){
+    activated = false;
+    sosLabel.textContent = 'HOLD';
+    sosTitle.textContent = 'Press and hold 3 seconds';
+    sosRing.style.strokeDashoffset = circumference;
+  }
+
+  sosBtn.addEventListener('pointerdown', startHold);
+  sosBtn.addEventListener('pointerup', cancelHold);
+  sosBtn.addEventListener('pointerleave', cancelHold);
+
+  /* ---------- safe walk timer ---------- */
+  var timerSelect = document.getElementById('timerSelect');
+  var timerDisplay = document.getElementById('timerDisplay');
+  var timerBtn = document.getElementById('timerBtn');
+  var timerInterval = null;
+  var remaining = 0;
+  var running = false;
+
+  function formatTime(s){
+    var m = Math.floor(s/60), sec = s%60;
+    return (m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;
+  }
+
+  timerBtn.addEventListener('click', function(){
+    if (!running){
+      remaining = parseInt(timerSelect.value, 10);
+      timerDisplay.textContent = formatTime(remaining);
+      timerDisplay.classList.add('show');
+      timerSelect.style.display = 'none';
+      timerBtn.textContent = 'End walk';
+      running = true;
+      timerInterval = setInterval(function(){
+        remaining--;
+        if (remaining <= 0){
+          clearInterval(timerInterval);
+          timerDisplay.textContent = "You've arrived";
+          setTimeout(stopTimer, 2000);
+          return;
+        }
+        timerDisplay.textContent = formatTime(remaining);
+      }, 1000);
+    } else {
+      stopTimer();
+    }
+  });
+
+  function stopTimer(){
+    clearInterval(timerInterval);
+    running = false;
+    timerDisplay.classList.remove('show');
+    timerSelect.style.display = '';
+    timerBtn.textContent = 'Start walk';
+  }
+
+  document.getElementById('timerScrollBtn').addEventListener('click', function(){
+    document.getElementById('timerPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  /* ---------- radar blip tooltips (simple demo) ---------- */
+  document.querySelectorAll('.radar-blip').forEach(function(blip){
+    blip.addEventListener('click', function(){
+      alert(blip.getAttribute('title'));
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
