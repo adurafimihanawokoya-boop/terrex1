@@ -1,7 +1,7 @@
 {
-  "name": "terrex-server",
+  "name": "terrex-api",
   "version": "1.0.0",
-  "description": "TERREX API server — Express + MySQL (mysql2)",
+  "description": "TERREX (SkyGuard) API server — Express + MySQL",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
