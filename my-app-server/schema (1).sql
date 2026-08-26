@@ -8,6 +8,8 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS verification_codes;
 DROP TABLE IF EXISTS safety_checks;
 DROP TABLE IF EXISTS sos_events;
 DROP TABLE IF EXISTS safe_walk_sessions;
@@ -27,14 +29,15 @@ CREATE TABLE users (
   full_name       VARCHAR(120)     NOT NULL,
   email           VARCHAR(190)     NOT NULL,
   password_hash   VARCHAR(255)     NOT NULL,
+  email_verified  TINYINT(1)       NOT NULL DEFAULT 0,
   created_at      DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO users (full_name, email, password_hash, created_at) VALUES
-('Amaka Obi',   'amaka@example.com',  '$2y$10$demoHashPlaceholder0001', '2025-01-14 09:12:00'),
-('Jide Taiwo',  'jide@example.com',   '$2y$10$demoHashPlaceholder0002', '2025-02-02 18:40:00'),
-('Maya Bello',  'maya@example.com',   '$2y$10$demoHashPlaceholder0003', '2025-03-21 07:55:00');
+INSERT INTO users (full_name, email, password_hash, email_verified, created_at) VALUES
+('Amaka Obi',   'amaka@example.com',  '$2y$10$demoHashPlaceholder0001', 1, '2025-01-14 09:12:00'),
+('Jide Taiwo',  'jide@example.com',   '$2y$10$demoHashPlaceholder0002', 1, '2025-02-02 18:40:00'),
+('Maya Bello',  'maya@example.com',   '$2y$10$demoHashPlaceholder0003', 0, '2025-03-21 07:55:00');
 
 -- ------------------------------------------------------------
 -- alerts
@@ -184,3 +187,43 @@ INSERT INTO safety_checks (user_id, location, result, summary, checked_at) VALUE
 (1, 'Chevron Drive',        'caution', 'A report was flagged along this route in the last few hours.', '2026-08-17 07:58:00'),
 (1, 'Admiralty Way',        'clear',   'No incidents reported on the route to Admiralty Way.',          '2026-08-16 18:20:00'),
 (2, 'Ligali Ayorinde St',   'caution', '2 unresolved reports within 1km in the last 6 hours.',          '2026-08-17 06:35:00');
+
+-- ------------------------------------------------------------
+-- verification_codes
+-- One row per 6-digit code emailed to a user during register
+-- or login. Checked and marked used by POST /api/verify-code.
+-- ------------------------------------------------------------
+CREATE TABLE verification_codes (
+  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT UNSIGNED                    NOT NULL,
+  code         CHAR(6)                         NOT NULL,
+  purpose      ENUM('register','login')        NOT NULL,
+  expires_at   DATETIME                        NOT NULL,
+  used         TINYINT(1)                      NOT NULL DEFAULT 0,
+  created_at   DATETIME                        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_vcode_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO verification_codes (user_id, code, purpose, expires_at, used, created_at) VALUES
+(1, '482913', 'register', '2025-01-14 09:22:00', 1, '2025-01-14 09:12:00'),
+(3, '150742', 'register', '2026-08-18 08:10:00', 0, '2026-08-18 08:00:00');
+
+-- ------------------------------------------------------------
+-- notifications
+-- Log of emails sent to alert users about danger reports or
+-- app updates. user_id NULL means it was emailed to everyone.
+-- ------------------------------------------------------------
+CREATE TABLE notifications (
+  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT UNSIGNED                    NULL,
+  title        VARCHAR(160)                    NOT NULL,
+  body         VARCHAR(255)                    NOT NULL,
+  type         ENUM('danger','update')         NOT NULL DEFAULT 'update',
+  sent_at      DATETIME                        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO notifications (user_id, title, body, type, sent_at) VALUES
+(NULL, 'Attempted break-in reported', 'A critical alert was reported 0.4km from your area.', 'danger', '2026-08-17 08:05:00'),
+(NULL, 'TERREX app updated', 'New safe-walk timer options are now available.', 'update', '2026-08-12 12:00:00');
+
