@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from "react";
    "x-admin-token" header, matching server.js's requireAdmin check.
    ============================================================ */
 
-const API_BASE = "http://localhost:4000/api";
+const API_BASE = "https://terrex-lfoq.onrender.com";
 
 async function adminFetch(token, path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {

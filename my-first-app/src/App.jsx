@@ -18,7 +18,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useId } from "react"
    calls are included below but will 401 until user-scoped write routes
    (or an admin token) are added on the server. */
 
-const API_BASE = "http://localhost:4000/api";
+const API_BASE = "https://terrex-lfoq.onrender.com";
 
 async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
