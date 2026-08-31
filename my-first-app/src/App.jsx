@@ -463,7 +463,9 @@ function AuthShell({ children }) {
         </div>
         {children}
       </div>
-      <div className="auth-footnote">Demo interface — not connected to emergency services</div>
+      <div className="auth-footnote">
+        <h1>THIS APP WAS PROUDLY CREATED BY AWOKOYA ADURAFIMIHAN ISAAC</h1>
+      </div>
     </div>
   );
 }
@@ -1045,7 +1047,9 @@ function HomePage({ user, alerts, circle, onNavigate, onCheckLocation, onTrigger
               <div className="sos-copy">
                 <div className="t">{sosActivated ? "Alert sent to your trusted circle" : "Press and hold 3 seconds"}</div>
                 <div className="d">Alerts your trusted circle with your live location.</div>
-                <div className="demo-flag">Demo interface — not connected to emergency services</div>
+                <div className="demo-flag">
+                  <h1>THIS APP WAS PROUDLY CREATED BY AWOKOYA ADURAFIMIHAN</h1>
+                </div>
               </div>
             </div>
           </section>
